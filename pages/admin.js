@@ -51,7 +51,6 @@ export default function AdminPage() {
   const load = async () => {
     setLoading(true);
     setMsg("Sprawdzam uprawnienia...");
-    // sprawdź, czy bieżący użytkownik jest adminem
     const { data: isAdminFlag, error: flagErr } = await supabase.rpc("is_current_user_admin");
     if (flagErr) {
       setMsg("Błąd: " + flagErr.message);
@@ -113,10 +112,17 @@ export default function AdminPage() {
     }
     try {
       setMsg("Ustawiam nowe hasło...");
+      // pobierz aktualny access token (nie zawsze konieczny przy tej wersji API, ale bezpiecznie mieć)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || "";
+
       const res = await fetch("/api/admin/set-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, newPassword: pwd }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ user_id: userId, new_password: pwd }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Błąd serwera");
@@ -130,6 +136,11 @@ export default function AdminPage() {
     <RequireAuth>
       {(me) => (
         <div className="container">
+          {/* WERSJA DO WERYFIKACJI */}
+          <div className="card" style={{ marginBottom: 8, background:"#0b1327", border:"1px dashed #334155" }}>
+            <b>ADMIN v3</b> — jeśli nie widzisz tego napisu na /admin, to nie wgrała się nowa wersja.
+          </div>
+
           <h1>Panel administratora</h1>
 
           <div className="card" style={{ marginBottom: 16 }}>
