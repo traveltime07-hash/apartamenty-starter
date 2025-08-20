@@ -38,7 +38,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const [q, setQ] = useState("");
-  const [accessToken, setAccessToken] = useState(null);
 
   const filtered = useMemo(() => {
     if (!q) return rows;
@@ -52,11 +51,7 @@ export default function AdminPage() {
   const load = async () => {
     setLoading(true);
     setMsg("Sprawdzam uprawnienia...");
-
-    // pobierz token admina (do autoryzacji API /api/admin/set-password)
-    const { data: sessionData } = await supabase.auth.getSession();
-    setAccessToken(sessionData?.session?.access_token || null);
-
+    // sprawdź, czy bieżący użytkownik jest adminem
     const { data: isAdminFlag, error: flagErr } = await supabase.rpc("is_current_user_admin");
     if (flagErr) {
       setMsg("Błąd: " + flagErr.message);
@@ -108,27 +103,20 @@ export default function AdminPage() {
     else setMsg("Wysłano link resetu hasła.");
   };
 
-  // NOWOŚĆ: zmiana hasła „tu i teraz” bez maila
+  // >>> ZMIANA HASŁA bez maila (wołamy nasz endpoint serwerowy)
   const changePassword = async (userId) => {
     const pwd = prompt("Podaj nowe hasło (min. 6 znaków):");
-    if (!pwd) return;
+    if (pwd == null) return; // anulowane
     if (pwd.length < 6) {
       alert("Hasło musi mieć co najmniej 6 znaków.");
-      return;
-    }
-    if (!accessToken) {
-      setMsg("Brak tokenu sesji admina. Odśwież stronę i zaloguj się ponownie.");
       return;
     }
     try {
       setMsg("Ustawiam nowe hasło...");
       const res = await fetch("/api/admin/set-password", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ user_id: userId, new_password: pwd }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, newPassword: pwd }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Błąd serwera");
